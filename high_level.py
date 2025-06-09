@@ -4,6 +4,7 @@ import argparse
 from PIL import Image
 from subtask_tree import generate_subtask_tree
 from subsequence import generate_subsequences
+from inductive_reasoning import refine_rules_if_needed
 from tool_subgraph import build_tool_subgraph_from_subtask_tree
 from execute_sequence import run_subsequence
 from main import ToolPipeline
@@ -24,6 +25,16 @@ def main(image_path, prompt_text, output_tree="Tree.json", sequence_file="Sub.js
     
     img = Image.open(image_path)
 
+    trace = {}
+    for key in range(1, 17):
+        trace[f"SR{key}"] = {
+            "subtask": f"Subtask {key}",
+            "tools": [],
+            "path_cost": 0,
+            "path_quality": 0,
+            "failures": {}
+        }
+
     # Replace 'openai_api' with the actual API key for openAI.
     os.environ['OPENAI_API_KEY'] = ''
     
@@ -41,7 +52,7 @@ def main(image_path, prompt_text, output_tree="Tree.json", sequence_file="Sub.js
     
     subtask_graph = load_subtask_tree(output_tree)
     final_graph = build_tool_subgraph_from_subtask_tree(subtask_graph)
-    high_level_subsequences = generate_subsequences(llm_api_key, output_tree, image_path, prompt_text)
+    high_level_subsequences = generate_subsequences(llm_api_key, output_tree, image_path, prompt_text, trace)
 
     tool_subgraph_file = "Tool_graph.json"
     with open(tool_subgraph_file, "w") as f:
@@ -58,9 +69,9 @@ def main(image_path, prompt_text, output_tree="Tree.json", sequence_file="Sub.js
     # Load subsequences from the file
     subsequence_tree = load_subsequences(sequence_file)
     
-    print("=== Final Tool Subgraph ===")
-    for key, value in final_graph.items():
-        print(f"{key}: {value}")
+    # print("=== Final Tool Subgraph ===")
+    # for key, value in final_graph.items():
+    #     print(f"{key}: {value}")
     
     # Replace 'stability_api' with the actual API key for StabilityAI in order to run Stable Diffusion Models.
     os.environ['STABILITY_API_KEY'] = ''
@@ -71,6 +82,8 @@ def main(image_path, prompt_text, output_tree="Tree.json", sequence_file="Sub.js
     original_inputs = {"image": img}
 
     optimal_path, final_state, local_memory, trace = run_subsequence(subsequence_tree, alpha, quality_threshold, original_inputs, prompt_text, pipeline)
+
+    refine_rules_if_needed(llm_api_key)
     
     print("Optimal path:", optimal_path)
     
@@ -108,5 +121,11 @@ if __name__ == "__main__":
     
     args = parser.parse_args()
     
-    main(args.image, args.prompt, args.output, args.output_image, args.alpha, args.quality_threshold)
+    # main(args.image, args.prompt, args.output, args.output_image, args.alpha, args.quality_threshold)
+    main(image_path=args.image,
+     prompt_text=args.prompt,
+     output_tree=args.output,
+     output_image=args.output_image,
+     alpha=args.alpha,
+     quality_threshold=args.quality_threshold)
 
