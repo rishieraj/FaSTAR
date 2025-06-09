@@ -435,7 +435,7 @@ def a_star_search(Gts, alpha, quality_threshold, original_inputs, task_prompt, p
             #Need to update this part for integrating the retry mechanism by defining hyperparameter changes for each model
             if quality < quality_threshold:
                 print(f"Quality check failed for {next_tool} with quality {quality:.2f}")
-                continue
+                # continue
 
             if next_tool not in best or new_g < best[next_tool]:
                 best[next_tool] = new_g

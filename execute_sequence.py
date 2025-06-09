@@ -1,8 +1,10 @@
 from math import inf
 import json
+from re import escape, compile
 from collections import defaultdict
 from typing import Dict, List, Any, Tuple
 from astar_search import a_star_search, compute_quality_dynamic, extract_metadata_from_node
+from inductive_reasoning import append_trace, _load_rules
 
 def build_low_graph_for_subtask(subtask_key: str,
                                 global_graph_path: str = "Tool_graph.json"):
@@ -13,20 +15,23 @@ def build_low_graph_for_subtask(subtask_key: str,
     with open(global_graph_path) as f:
         g = json.load(f)
 
-    sub_suffix = f"{subtask_key})"        # e.g. "Object Removal (Plant)(2))"
-    low = defaultdict(list)
+    patt = compile(fr"{escape(subtask_key)}.*\(\d+\)\)$")
 
-    # keep nodes whose name ends with that suffix, plus Input Image
-    valid = {n for n in g if n.endswith(sub_suffix)} | {"Input Image"}
+    low   = defaultdict(list)
+    valid = {n for n in g if patt.search(n)} | {"Input Image"}
+
+    # NEW ↓  keep *one* parent that connects Input Image with the first match
+    parents = [v for v in g["Input Image"] if any(v in g and v2 in valid
+                                                  for v2 in g[v])]
+    valid |= set(parents)
 
     for u in valid:
         low[u] = [v for v in g.get(u, []) if v in valid]
 
-    # if Input Image had no outgoing edge, add ones that start the chain
-    if "Input Image" in low and not low["Input Image"]:
-        for v in g["Input Image"]:
-            if v in valid:
-                low["Input Image"].append(v)
+    if not low["Input Image"]:
+        # still isolated? fall back to direct children of Input Image
+        low["Input Image"] = [v for v in g["Input Image"] if v in valid]
+
     return low
 
 def run_subsequence(subsequence_map: Dict[str, List[str]],
@@ -67,6 +72,7 @@ def run_subsequence(subsequence_map: Dict[str, List[str]],
         "SR15": { "subtask": "Text Replacement", "tools": ["CRAFT", "EasyOCR", "DeepFont", "GPT4o_2", "DalleText", "TextWritingPillow1"], "C": 18.02, "Q": 0.94},
         "SR16": { "subtask": "Text Replacement", "tools": ["CRAFT", "EasyOCR", "DeepFont", "GPT4o_2", "TextRemovalPainting", "TextWritingPillow1"], "C": 6.77, "Q": 0.93}
     }
+    SRT.update(_load_rules())
 
     subsequences = []
     local_memory = {}
@@ -101,64 +107,85 @@ def run_subsequence(subsequence_map: Dict[str, List[str]],
     state: Dict[str,Any] = original_inputs.copy()
 
     for idx, sub in enumerate(subsequences):
-        tools = SRT[sub]["tools"]
         subtask = subtasks_list[idx]
-        print(f"Subtask: {subtask}")
-        path_cost = SRT[sub]["C"]
-        path_quality = SRT[sub]["Q"]
-        tool_check = {}
-        for tk in tools:
-            key = f"{tk} ({subtask})"
-            print(f"Processing tool: {key}")
-            meta = extract_metadata_from_node(key)
-            state.update(meta)
-            tool = pipeline.load_tool(tk)
-            inputs = {k: state[k] for k in pipeline._get_tool_input_spec(tk)}
-            result = tool.process(**inputs)
-            local_memory[key] = result
-            path.append(key)
 
-            if isinstance(result, dict):
-                output_image = result.get("image", state.get("image"))
-                state.update(result)
-            else:
-                output_image = result
-                state['image'] = result
+        if sub != "None":
+            tools = SRT[sub]["tools"]
+            print(f"Processing subtask: {sub} with tools: {tools}")
+            print(f"Subtask: {subtask}")
+            path_cost = SRT[sub]["C"]
+            path_quality = SRT[sub]["Q"]
+            tool_check = {}
+            for tk in tools:
+                key = f"{tk} ({subtask})"
+                print(f"Processing tool: {key}")
+                meta = extract_metadata_from_node(key)
+                state.update(meta)
+                print(f"Tool metadata: {meta}")
+                tool = pipeline.load_tool(tk)
+                inputs = {k: state[k] for k in pipeline._get_tool_input_spec(tk)}
+                result = tool.process(**inputs)
+                print(f"Tool result: {result}")
+                local_memory[key] = result
+                path.append(key)
 
-            quality = compute_quality_dynamic(
-                key,
-                tk,
-                original_inputs["image"],
-                output_image,
-                task_prompt,
-                result,
-                state.get("bounding_boxes", None),
-                state,
-                path,
-                local_memory
-            )
+                if isinstance(result, dict):
+                    output_image = result.get("image", state.get("image"))
+                    state.update(result)
+                else:
+                    output_image = result
+                    state['image'] = result
 
-            if quality < quality_threshold:
-                tool_check[tk] = "fail"
-                glow = build_low_graph_for_subtask(subtask)
-                low_path, state, low_local_memory = a_star_search(
-                        glow, alpha, quality_threshold,
-                        state, task_prompt, pipeline)
-                break
-            else:
-                tool_check[tk] = "success"
+                quality = compute_quality_dynamic(
+                    key,
+                    tk,
+                    original_inputs["image"],
+                    output_image,
+                    task_prompt,
+                    result,
+                    state.get("bounding_boxes", None),
+                    state,
+                    path,
+                    local_memory
+                )
 
-        path.extend(low_path[1:])
-        local_memory.update(low_local_memory)
+                print(f"Computed quality for {key}: {quality} (Threshold: {quality_threshold})")
+                if quality < quality_threshold:
+                    tool_check[tk] = "fail"
+                    glow = build_low_graph_for_subtask(subtask)
+                    print(glow)
+                    low_path, state, low_local_memory = a_star_search(
+                            glow, alpha, quality_threshold,
+                            state, task_prompt, pipeline)
+                    print(f"Low path found: {low_path}")
+                    break
+                else:
+                    tool_check[tk] = "success"
+
+        else:
+            glow = build_low_graph_for_subtask(subtask)
+            print("Tool sub-graph for Subtask: ", glow)
+            low_path, state, low_local_memory = a_star_search(
+                    glow, alpha, quality_threshold,
+                    state, task_prompt, pipeline)
+            print("A-Star path for Subtask: ", low_path)
+
+
+        if low_path:
+            path.extend(low_path[1:])
+            local_memory.update(low_local_memory)
+
+        print(f"Final Path after subtask {subtask}: {path}")
 
         trace[sub] = {
             "subtask": subtask,
-            "tools": tools,
-            "path_cost": path_cost,
-            "path_quality": path_quality,
-            "failures": tool_check
+            # "tools": tools,
+            # "path_cost": path_cost,
+            # "path_quality": path_quality,
+            # "failures": tool_check if tool_check else "success"
         }
 
+    append_trace(trace)
     return path, state, local_memory, trace
 
 

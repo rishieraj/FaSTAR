@@ -1,1 +1,6 @@
 checkpoints/
+__pycache__/
+tools/yolov7/
+tools/GroundingDINO/
+final_output.png
+

@@ -16,8 +16,8 @@ class SAMTool(BaseTool):
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
         self.multimask_output = config.get('multimask_output', True)
         self.checkpoint = config.get('checkpoint', None)
-        if self.checkpoint is not None:
-            self.load_model(self.checkpoint)
+        # if self.checkpoint is not None:
+        #     self.load_model(self.checkpoint)
 
     def load_model(self, checkpoint_path: str):
         if not Path(checkpoint_path).exists():
@@ -35,47 +35,51 @@ class SAMTool(BaseTool):
         alpha: float = 0.6
     ) -> dict:
      
-        if self.predictor is None:
-            if self.checkpoint is None:
-                raise RuntimeError("No checkpoint path provided. Please specify one in config.")
-            self.load_model(self.checkpoint)
+        # if self.predictor is None:
+        #     if self.checkpoint is None:
+        #         raise RuntimeError("No checkpoint path provided. Please specify one in config.")
+        #     self.load_model(self.checkpoint)
 
-        image_np = np.array(image)
-        self.predictor.set_image(image_np)
+        # image_np = np.array(image)
+        # self.predictor.set_image(image_np)
 
-        boxes_torch = torch.tensor(bounding_boxes, dtype=torch.float, device=self.device)
-        if boxes_torch.ndim != 2 or boxes_torch.shape[1] != 4:
-            raise ValueError("bounding_boxes must be a list of [x1, y1, x2, y2] entries.")
+        # boxes_torch = torch.tensor(bounding_boxes, dtype=torch.float, device=self.device)
+        # if boxes_torch.ndim != 2 or boxes_torch.shape[1] != 4:
+        #     raise ValueError("bounding_boxes must be a list of [x1, y1, x2, y2] entries.")
 
-        boxes_torch = self.predictor.transform.apply_boxes_torch(boxes_torch, image_np.shape[:2])
+        # boxes_torch = self.predictor.transform.apply_boxes_torch(boxes_torch, image_np.shape[:2])
 
-        start_time = time.time()
-        masks, scores, logits = self.predictor.predict_torch(
-            point_coords=None,
-            point_labels=None,
-            boxes=boxes_torch,
-            multimask_output=self.multimask_output
-        )
-        end_time = time.time()
+        # start_time = time.time()
+        # masks, scores, logits = self.predictor.predict_torch(
+        #     point_coords=None,
+        #     point_labels=None,
+        #     boxes=boxes_torch,
+        #     multimask_output=self.multimask_output
+        # )
+        # end_time = time.time()
 
-        if self.multimask_output:
-            best_masks = masks[:, 0, :, :] 
-        else:
-            best_masks = masks.squeeze(1)
+        # if self.multimask_output:
+        #     best_masks = masks[:, 0, :, :] 
+        # else:
+        #     best_masks = masks.squeeze(1)
 
-        final_image, cutout_images = overlay_and_generate_cutouts(image, best_masks.cpu().numpy(), subtask_name, random_color, alpha)
+        # final_image, cutout_images = overlay_and_generate_cutouts(image, best_masks.cpu().numpy(), subtask_name, random_color, alpha)
 
-        # output_dir = "outputs"
-        # os.makedirs(output_dir, exist_ok=True)
+        # # output_dir = "outputs"
+        # # os.makedirs(output_dir, exist_ok=True)
 
-        # cutout_paths = []
-        # for idx, cutout_img in enumerate(cutout_images):
-        #     cutout_path = os.path.join(output_dir, f"cutout_image_{idx}.png")
-        #     cutout_img.save(cutout_path)
-        #     cutout_paths.append(cutout_path)
-        #     print(f"Cutout {idx} saved at: {cutout_path}")
+        # # cutout_paths = []
+        # # for idx, cutout_img in enumerate(cutout_images):
+        # #     cutout_path = os.path.join(output_dir, f"cutout_image_{idx}.png")
+        # #     cutout_img.save(cutout_path)
+        # #     cutout_paths.append(cutout_path)
+        # #     print(f"Cutout {idx} saved at: {cutout_path}")
 
-        execution_time = end_time - start_time 
+        # execution_time = end_time - start_time 
+
+        final_image = Image.open("inputs/40_plant_mask.png")  # Placeholder for final image
+        cutout_images = [Image.open("inputs/40_cutout.png")]  # Placeholder for cutout images
+        execution_time = 0.0
 
         return {"image": final_image, "cutout_images": cutout_images, "execution_time": execution_time}
 

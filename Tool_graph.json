@@ -1,0 +1,34 @@
+{
+    "Input Image": [
+        "StabilityOutpaint (Outpainting ()(1))"
+    ],
+    "StabilityOutpaint (Outpainting ()(1))": [
+        "GroundingDINO (Object Segmentation (Dog)(2))",
+        "YOLOv7 (Object Segmentation (Dog)(2))",
+        "GroundingDINO (Object Detection (Person)(3))",
+        "YOLOv7 (Object Detection (Person)(3))",
+        "StabilitySearchRecolor (Object Recoloration (Leaves -> Red)(4))",
+        "GroundingDINO (Object Recoloration (Leaves -> Red)(4))",
+        "YOLOv7 (Object Recoloration (Leaves -> Red)(4))"
+    ],
+    "GroundingDINO (Object Segmentation (Dog)(2))": [
+        "SAM (Object Segmentation (Dog)(2))"
+    ],
+    "YOLOv7 (Object Segmentation (Dog)(2))": [
+        "SAM (Object Segmentation (Dog)(2))"
+    ],
+    "SAM (Object Segmentation (Dog)(2))": [],
+    "GroundingDINO (Object Detection (Person)(3))": [],
+    "YOLOv7 (Object Detection (Person)(3))": [],
+    "StabilitySearchRecolor (Object Recoloration (Leaves -> Red)(4))": [],
+    "GroundingDINO (Object Recoloration (Leaves -> Red)(4))": [
+        "SAM (Object Recoloration (Leaves -> Red)(4))"
+    ],
+    "YOLOv7 (Object Recoloration (Leaves -> Red)(4))": [
+        "SAM (Object Recoloration (Leaves -> Red)(4))"
+    ],
+    "StabilityInpaint (Object Recoloration (Leaves -> Red)(4))": [],
+    "SAM (Object Recoloration (Leaves -> Red)(4))": [
+        "StabilityInpaint (Object Recoloration (Leaves -> Red)(4))"
+    ]
+}
